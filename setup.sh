@@ -15,7 +15,7 @@ pkg install python git -y || { echo -e "${RED}Python veya Git yüklenemedi.${NC}
 
 # 2. Python bağımlılıklarını yükle
 echo -e "${GREEN}[2/4] Python bağımlılıklarını yüklüyor...${NC}"
-pip install --upgrade pip || { echo -e "${RED}Pip güncellenemedi.${NC}"; exit 1; }
+# pip install --upgrade pip || { echo -e "${RED}Pip güncellenemedi.${NC}"; exit 1; } # <-- Bu satırı yorumladık
 pip install -r requirements.txt || { echo -e "${RED}Bağımlılıklar yüklenemedi.${NC}"; exit 1; }
 
 # 3. .env dosyasını kontrol et
