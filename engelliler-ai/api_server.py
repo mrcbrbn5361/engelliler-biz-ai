@@ -5,8 +5,7 @@ from ai_engine import generate_response
 
 app = FastAPI()
 
-class Query(BaseModel):
-    prompt: str
+class Query(BaseModel):    prompt: str
 
 @app.post("/ask")
 async def ask(query: Query):

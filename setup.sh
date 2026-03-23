@@ -17,11 +17,11 @@ pkg install python git -y || { echo -e "${RED}Python veya Git yüklenemedi.${NC}
 echo -e "${GREEN}[2/6] Python bağımlılıklarını yüklüyor...${NC}"
 pip install -r requirements.txt || { echo -e "${RED}Bağımlılıklar yüklenemedi.${NC}"; exit 1; }
 
-# 3. .env dosyasını kontrol et
+# 3. .env dosyasını kontrol et (ana dizinde)
 echo -e "${GREEN}[3/6] .env dosyasını kontrol ediyor...${NC}"
-if [ ! -f ".env" ]; then
+if [ ! -f "./.env" ]; then
     echo -e "${YELLOW}.env dosyası bulunamadı. Yeni bir tane oluşturuluyor...${NC}"
-    cat > .env << 'EOF_ENV'
+    cat > ./.env << 'EOF_ENV'
 API_HOST=localhost
 API_PORT=8000
 OPENROUTER_API_KEY=your_openrouter_api_key_here
@@ -45,15 +45,6 @@ fi
 
 # 5. engelliler-ai klasörüne dosyalar ekle
 echo -e "${GREEN}[5/6] engelliler-ai klasörüne dosyalar ekleniyor...${NC}"
-# config.py dosyasını oluştur
-cat > engelliler-ai/config.py << 'EOF_CONFIG'
-# Ayarlar dosyası
-API_URL = "https://api.openrouter.ai/v1/chat/completions"
-MODEL_NAME = "gemini-2.5-pro"
-MAX_TOKENS = 4096
-TEMPERATURE = 0.7
-EOF_CONFIG
-
 # scraper.py dosyasını oluştur
 cat > engelliler-ai/scraper.py << 'EOF_SCRAPER'
 # XenForo scraper
@@ -94,7 +85,8 @@ def generate_response(prompt):
         raise Exception(f"API error: {response.status_code}")
 EOF_AI_ENGINE
 
-# api_server.py dosyasını oluşturcat > engelliler-ai/api_server.py << 'EOF_API_SERVER'
+# api_server.py dosyasını oluştur
+cat > engelliler-ai/api_server.py << 'EOF_API_SERVER'
 # FastAPI backend
 from fastapi import FastAPI
 from pydantic import BaseModel
@@ -102,8 +94,7 @@ from ai_engine import generate_response
 
 app = FastAPI()
 
-class Query(BaseModel):
-    prompt: str
+class Query(BaseModel):    prompt: str
 
 @app.post("/ask")
 async def ask(query: Query):
