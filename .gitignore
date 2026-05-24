@@ -1,2 +1,8 @@
+__pycache__/
+*.pyc
+data/chroma/*
+!data/chroma/.gitkeep
+data/logs/*
+!data/logs/.gitkeep
 .env
-.env
+.DS_Store
