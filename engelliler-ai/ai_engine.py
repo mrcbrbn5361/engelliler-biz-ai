@@ -12,8 +12,8 @@ load_dotenv()
 class AIEngine:
     def __init__(self):
         self.api_key = os.getenv("OPENROUTER_API_KEY")
-        # Ücretsiz ve hızlı model: google/gemini-flash-1.5-8b
-        self.model = os.getenv("AI_MODEL", "google/gemini-flash-1.5-8b")
+        # Ücretsiz ve hızlı model: deepseek/deepseek-v4-flash:free
+        self.model = os.getenv("AI_MODEL", "deepseek/deepseek-v4-flash:free")
         self.kb = KnowledgeBase()
 
     def generate_response(self, prompt: str, use_rag: bool = True):
