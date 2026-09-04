@@ -47,8 +47,10 @@ kullanın, paketli import denemeyin.
    çevirisi (Türkçe) + log. Gizli anahtarları loglama/koda gömme.
 4. **Config disiplini:** yeni ortam değişkeni → `.env.example` + `config.py:Settings` +
    `README` üçlüsünü birlikte güncelle.
-5. **Bağımlılık disiplini:** yeni paket → kök `requirements.txt`'e sürümlü aralıkla ekle;
-   Termux'ta derlenemeyen ağır paketlerden (lxml, ChromaDB vb.) kaçın, gerekçeyi PR'a yaz.
+5. **Bağımlılık disiplini:** yeni paket → kök `requirements.txt`'e ekle; Termux/Android'da
+   wheel'siz kalan paketler (pydantic-core vb.) kaynaktan derlenemez → sistemde çalışan
+   sürüme eşitlikle sabitle (`==`), `setup.sh`'teki `--system-site-packages` + `--prefer-binary`
+   ikilisini koru. Ağır derleme gerektiren paketlerden (lxml, ChromaDB vb.) kaçın.
 6. **Test:** her davranış değişikliği `tests/test_smoke.py`'a stdlib-only test olarak eklenir;
    `PYTHONPATH=engelliler-ai python -m unittest discover -s tests` yeşil olmadan bitirme.
 7. **Kaynak ezme yasağı:** kurulum/migrasyon scriptleri version'lı dosyaları heredoc'la

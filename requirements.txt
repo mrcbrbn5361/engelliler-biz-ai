@@ -1,8 +1,13 @@
 # engelliler-biz-ai — kök bağımlılık dosyası (kurulum: pip install -r requirements.txt)
 # engelliler-ai/requirements.txt bu dosyayı referans alır, tek kaynak burasıdır.
-fastapi>=0.115,<0.142
-uvicorn>=0.30
-requests>=2.31
-python-dotenv>=1.0
-beautifulsoup4>=4.12
-httpx>=0.27
+#
+# NOT: Sürümler eşitlikle sabitlendi. Sebep: Termux/Android + Python 3.14 için
+# pydantic-core'un PyPI'da hazır paketi (wheel) yok; kaynaktan derleme Rust+NDK
+# istiyor ve başarısız oluyor. Sistemde çalışan sürümlerle birebir gidilir.
+fastapi==0.141.1
+uvicorn==0.52.4
+requests==2.31.0
+python-dotenv==1.0.0
+beautifulsoup4==4.12.2
+httpx==0.28.1
+pydantic==2.13.4

@@ -15,17 +15,19 @@ command -v python3 >/dev/null || fail "python3 bulunamadı. Önce Python 3.10+ k
 info "Python: $(python3 --version)"
 
 # 2. Sanal ortam (Termux pkg dahil sistem paketine dokunmaz)
+# --system-site-packages ŞART: pydantic-core gibi paketlerin Termux/Android için
+# PyPI'da wheel'i yok; sistemdeki çalışan kopyalar venv'den görünür olmalı.
 if [ ! -d ".venv" ]; then
     info "Sanal ortam oluşturuluyor (.venv)..."
-    python3 -m venv .venv || fail "venv oluşturulamadı."
+    python3 -m venv --system-site-packages .venv || fail "venv oluşturulamadı."
 fi
 # shellcheck disable=SC1091
 source .venv/bin/activate
 
-# 3. Bağımlılıklar
+# 3. Bağımlılıklar (--prefer-binary: kaynaktan derlemeye kalkışma)
 info "Bağımlılıklar yükleniyor..."
 pip install --upgrade pip >/dev/null 2>&1 || true
-pip install -r requirements.txt || fail "Bağımlılıklar yüklenemedi."
+pip install --prefer-binary -r requirements.txt || fail "Bağımlılıklar yüklenemedi."
 
 # 4. .env
 if [ ! -f "./.env" ]; then
