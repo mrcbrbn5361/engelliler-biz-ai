@@ -16,7 +16,7 @@ from config import settings
 
 log = logging.getLogger("engelliler-biz-ai.ai")
 
-API_URL = "https://api.openrouter.ai/v1/chat/completions"
+API_URL = "https://openrouter.ai/api/v1/chat/completions"
 
 SYSTEM_PROMPT = (
     "Sen engelli bireyler için sade Türkçe konuşan erişilebilirlik asistanısın. "

@@ -34,7 +34,7 @@ class Settings:
     api_port: int = field(default_factory=lambda: _env_int("API_PORT", 8000))
     openrouter_api_key: str = field(default_factory=lambda: _env("OPENROUTER_API_KEY"))
     openrouter_model: str = field(
-        default_factory=lambda: _env("OPENROUTER_MODEL", "google/gemini-2.5-flash")
+        default_factory=lambda: _env("OPENROUTER_MODEL", "minimax/minimax-m3:free")
     )
     allowed_scrape_domain: str = field(
         default_factory=lambda: _env("ALLOWED_SCRAPE_DOMAIN", "engelliler.biz")
