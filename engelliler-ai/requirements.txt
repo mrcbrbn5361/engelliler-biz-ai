@@ -1,4 +1,2 @@
-fastapi
-uvicorn
-requests
-python-dotenv
+# Tek kaynak kök requirements.txt'tir — bu dosyayı ayrıca düzenlemeyin.
+-r ../requirements.txt

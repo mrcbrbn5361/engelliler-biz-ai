@@ -1,4 +1,8 @@
-fastapi
-uvicorn
-requests
-python-dotenv
+# engelliler-biz-ai — kök bağımlılık dosyası (kurulum: pip install -r requirements.txt)
+# engelliler-ai/requirements.txt bu dosyayı referans alır, tek kaynak burasıdır.
+fastapi>=0.115,<0.142
+uvicorn>=0.30
+requests>=2.31
+python-dotenv>=1.0
+beautifulsoup4>=4.12
+httpx>=0.27

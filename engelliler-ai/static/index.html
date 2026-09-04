@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Engelli bireyler için erişilebilir yapay zeka asistanı: engelliler.biz bilgi tabanından sade Türkçe yanıtlar.">
+<title>engelliler.biz AI — Erişilebilir Asistan</title>
+<style>
+  :root { --font-scale: 1; }
+  * { box-sizing: border-box; }
+  html { font-size: calc(100% * var(--font-scale)); }
+  body {
+    margin: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.7; color: #111; background: #fff;
+  }
+  body.hc { background: #000; color: #ffe600; }
+  body.hc a, body.hc button { color: #ffe600; }
+  .skip {
+    position: absolute; left: -9999px; top: 0; background: #111; color: #fff;
+    padding: .75rem 1rem; z-index: 100;
+  }
+  .skip:focus { left: 0; }
+  header, footer { background: #0b3d2e; color: #fff; padding: 1rem; }
+  body.hc header, body.hc footer { background: #000; border-bottom: 2px solid #ffe600; }
+  header a, footer a { color: #fff; }
+  nav ul { list-style: none; margin: .5rem 0 0; padding: 0; display: flex; gap: 1rem; flex-wrap: wrap; }
+  main { max-width: 44rem; margin: 0 auto; padding: 1rem; }
+  label { font-weight: 700; display: block; margin-bottom: .25rem; }
+  .hint { font-size: .9rem; margin-top: 0; }
+  textarea, input[type="search"] {
+    width: 100%; padding: .75rem; font: inherit; border: 2px solid #111; border-radius: .375rem;
+  }
+  button {
+    font: inherit; font-weight: 700; padding: .625rem 1.25rem; margin-top: .75rem;
+    background: #0b3d2e; color: #fff; border: 2px solid #0b3d2e; border-radius: .375rem; cursor: pointer;
+  }
+  button:hover { background: #14563f; }
+  :focus-visible { outline: 3px solid #e8590c; outline-offset: 2px; }
+  .toolbar { display: flex; gap: .5rem; flex-wrap: wrap; margin: 1rem 0; }
+  .toolbar button { background: #fff; color: #111; border-color: #111; margin-top: 0; }
+  #sonuc {
+    border: 2px solid #111; border-radius: .375rem; padding: 1rem; margin-top: 1.5rem;
+    min-height: 4rem; white-space: pre-wrap;
+  }
+  #durum { font-weight: 700; }
+  .hata { border-color: #b00020 !important; }
+  .hata-mesaji { color: #b00020; font-weight: 700; }
+  body.hc .hata-mesaji { color: #ff8080; }
+  footer { margin-top: 2rem; font-size: .9rem; }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { transition: none !important; animation: none !important; }
+  }
+</style>
+</head>
+<body>
+<a class="skip" href="#icerik">Ana içeriğe atla</a>
+
+<header>
+  <div><strong>engelliler.biz AI</strong> — Erişilebilir Asistan</div>
+  <nav aria-label="Sayfa içi">
+    <ul>
+      <li><a href="#soru-formu">Soru sor</a></li>
+      <li><a href="#sonuc">Yanıt</a></li>
+      <li><a href="/docs">API belgeleri</a></li>
+    </ul>
+  </nav>
+</header>
+
+<main id="icerik">
+  <h1>Engellilik hakları ve günlük yaşam hakkında soru sorun</h1>
+  <p>Yanıtlar sade Türkçe ile yazılır ve ekran okuyucularla uyumludur.</p>
+
+  <div class="toolbar" role="group" aria-label="Görünüm ayarları">
+    <button type="button" id="kucult" aria-label="Yazı boyutunu küçült">A−</button>
+    <button type="button" id="buyut" aria-label="Yazı boyutunu büyüt">A+</button>
+    <button type="button" id="kontrast" aria-pressed="false">Yüksek kontrast</button>
+  </div>
+
+  <form id="soru-formu" action="#" method="post">
+    <label for="soru">Sorunuz</label>
+    <p class="hint" id="soru-ipucu">Örnek: Engelli raporu nasıl alınır?</p>
+    <textarea id="soru" name="soru" rows="3" required minlength="3" maxlength="2000"
+      aria-describedby="soru-ipucu" placeholder="Sorunuzu buraya yazın"></textarea>
+    <button type="submit" id="gonder">Soruyu gönder</button>
+  </form>
+
+  <p id="durum" role="status" aria-live="polite"></p>
+  <section id="sonuc" tabindex="-1" aria-labelledby="sonuc-baslik" aria-live="polite">
+    <h2 id="sonuc-baslik">Yanıt</h2>
+    <div id="sonuc-metin">Henüz soru sorulmadı. Yanıt burada görünecek.</div>
+    <div id="kaynaklar"></div>
+  </section>
+</main>
+
+<footer>
+  <p>Bu proje unofficial bir topluluk çalışmasıdır; resmi işlemler için e-Devlet ve ilgili kurumları kontrol edin.
+  Klavye: <kbd>Tab</kbd> ile gezinin, <kbd>Enter</kbd> ile gönderin.</p>
+</footer>
+
+<noscript><p style="padding:1rem;font-weight:bold">Bu sayfa JavaScript kapalıyken çalışmaz; API'yi <a href="/docs">/docs</a> adresinden kullanabilirsiniz.</p></noscript>
+
+<script>
+(function () {
+  "use strict";
+  var form = document.getElementById("soru-formu");
+  var soru = document.getElementById("soru");
+  var gonder = document.getElementById("gonder");
+  var durum = document.getElementById("durum");
+  var sonuc = document.getElementById("sonuc");
+  var metin = document.getElementById("sonuc-metin");
+  var kaynaklar = document.getElementById("kaynaklar");
+
+  // Görünüm ayarları (kalıcı değil, oturumluk)
+  var olcek = 1;
+  document.getElementById("buyut").addEventListener("click", function () {
+    olcek = Math.min(1.5, olcek + 0.125);
+    document.documentElement.style.setProperty("--font-scale", olcek);
+  });
+  document.getElementById("kucult").addEventListener("click", function () {
+    olcek = Math.max(0.875, olcek - 0.125);
+    document.documentElement.style.setProperty("--font-scale", olcek);
+  });
+  document.getElementById("kontrast").addEventListener("click", function () {
+    var acik = document.body.classList.toggle("hc");
+    this.setAttribute("aria-pressed", acik ? "true" : "false");
+  });
+
+  form.addEventListener("submit", async function (e) {
+    e.preventDefault();
+    var q = soru.value.trim();
+    if (q.length < 3) {
+      durum.textContent = "Lütfen en az 3 karakterlik bir soru yazın.";
+      soru.focus();
+      return;
+    }
+    gonder.disabled = true;
+    durum.textContent = "Yanıt hazırlanıyor, lütfen bekleyin…";
+    metin.textContent = "";
+    kaynaklar.innerHTML = "";
+    try {
+      var res = await fetch("/api/ask", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question: q })
+      });
+      var data = await res.json();
+      if (!res.ok) throw new Error(data.detail || "Sunucu hatası");
+      metin.textContent = data.answer;
+      if (data.sources && data.sources.length) {
+        var h = document.createElement("h3");
+        h.textContent = "Kaynaklar";
+        kaynaklar.appendChild(h);
+        var ul = document.createElement("ul");
+        data.sources.forEach(function (s) {
+          var li = document.createElement("li");
+          li.textContent = s.title + (s.url ? " (" + s.url + ")" : "");
+          ul.appendChild(li);
+        });
+        kaynaklar.appendChild(ul);
+      }
+      durum.textContent = data.ai_used ? "Yapay zeka yanıtı hazır." : "Çevrimdışı özet hazır.";
+    } catch (err) {
+      durum.textContent = "";
+      metin.innerHTML = "";
+      var p = document.createElement("p");
+      p.className = "hata-mesaji";
+      p.textContent = "Yanıt alınamadı: " + err.message + " Lütfen sonra tekrar deneyin.";
+      metin.appendChild(p);
+    } finally {
+      gonder.disabled = false;
+      sonuc.focus({ preventScroll: false });
+    }
+  });
+})();
+</script>
+</body>
+</html>

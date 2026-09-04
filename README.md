@@ -1,42 +1,31 @@
-# 🤖 engelliler.biz AI API
+# 🤖 engelliler.biz AI
 
-engelliler.biz forum içeriği üzerinde çalışan yapay zeka asistanı API'si.
+engelliler.biz forum içeriği üzerinde çalışan, **erişilebilirlik öncelikli** yapay zeka asistanı.
+Engelli bireylerin haklar, rapor, bürokrasi ve günlük yaşam sorularına sade Türkçe yanıt verir.
 
 ## ✨ Özellikler
 
-- 🕷️ XenForo forum scraper
-- 🧠 RAG (Retrieval Augmented Generation)
-- 🤖 OpenRouter ücretsiz modeller (step-3.5-flash)
-- 📊 Vektör tabanlı arama (ChromaDB)
-- 🌐 FastAPI backend
-- 🐳 Docker desteği
+- 🕷️ Güvenli XenForo scraper (robots.txt + SSRF koruması + önbellek)
+- 🧠 OpenRouter yapay zekası + **anahtarsız çevrimdışı özet kipi**
+- 📚 JSON bilgi tabanı (`/api/knowledge/*`) — ChromaDB'ye geçişe hazır arayüz
+- 🌐 FastAPI backend + WCAG 2.2 AA hedefli erişilebilir web arayüzü (`/`)
+- 🐳 Docker / docker-compose desteği
+- 🧪 Ağ gerektirmeyen duman testleri
 
 ## 🚀 Hızlı Başlangıç
 
-### 1. Kurulum
-
 ```bash
-# Script ile
 bash setup.sh
-# Veya manuel
-pip install -r requirements.txt
-cp .env.example .env
-# .env dosyasını düzenle (OPENROUTER_KEY ekle)
+# .env dosyasını düzenle (OPENROUTER_API_KEY isteğe bağlı)
+
+source .venv/bin/activate
+python engelliler-ai/api_server.py
 ```
 
-### 2. API'yi Başlat
+- Arayüz: http://localhost:8000/
+- Swagger UI: http://localhost:8000/docs
 
 ```bash
-python api_server.py
-```
-
-### 3. Test Et
-
-```bash
-# Swagger UI
-http://localhost:8000/docs
-
-# cURL ile
 curl -X POST http://localhost:8000/api/ask \
   -H "Content-Type: application/json" \
   -d '{"question": "Engelli raporu nasıl alınır?"}'
@@ -46,36 +35,47 @@ curl -X POST http://localhost:8000/api/ask \
 
 | Endpoint | Method | Açıklama |
 |----------|--------|----------|
-| `/api/ask` | POST | AI'ya soru sor |
-| `/api/thread/{id}` | GET | Konu verisini getir |
-| `/api/search` | GET | Konu ara |
-| `/api/knowledge/add/{id}` | POST | Konuyu bilgi tabanına ekle |
-| `/api/knowledge/stats` | GET | İstatistikler |
+| `/` | GET | Erişilebilir web arayüzü |
 | `/health` | GET | Sağlık kontrolü |
+| `/api/ask` | POST | Yapay zekaya soru sor |
+| `/api/search?q=` | GET | Bilgi tabanında ara |
+| `/api/thread/{id}` | GET | Konu verisini getir (önbellekli) |
+| `/api/knowledge/add/{id}` | POST | Konuyu bilgi tabanına ekle |
+| `/api/knowledge/get/{id}` | GET | Kayıtlı konuyu getir |
+| `/api/knowledge/stats` | GET | İstatistikler |
 
-## 🔑 OpenRouter Key
+## 🔑 OpenRouter Key (isteğe bağlı)
 
-1. https://openrouter.ai/ adresine git
-2. Ücretsiz kaydol
-3. API key oluştur
-4. `.env` dosyasına ekle
+1. https://openrouter.ai/ adresine git, kaydol, API key oluştur
+2. `.env` dosyasına `OPENROUTER_API_KEY=...` yaz
+3. İstersen `OPENROUTER_MODEL` ile modeli değiştir (örn. `google/gemini-2.5-flash`)
+
+Anahtar yoksa uygulama **çevrimdışı kipte** çalışır: bilgi tabanındaki kayıtlardan özet üretir.
 
 ## 📦 Docker
 
 ```bash
-docker-compose up -d
+cp .env.example .env   # değerleri düzenle
+docker compose up -d
 ```
 
+## 🧪 Testler
+
+```bash
+PYTHONPATH=engelliler-ai python -m unittest discover -s tests -v
+```
+
+## ♿ Erişilebilirlik
+
+- Arayüz: `lang="tr"`, skip-link, landmark'lar, `aria-live` yanıt bölgesi, klavye ile tam kullanım, yüksek kontrast düğmesi, yazı boyutu düğmeleri, `prefers-reduced-motion` desteği
+- API yanıtları ve hatalar Türkçe, düz metin, ekran okuyucu dostu
+
 ## ⚠️ Yasal Uyarı
-- Bu proje unofficial'dır
-- Forum yönetimiyle iletişime geçin
-- `robots.txt` kurallarına uyun
+
+- Bu proje unofficial bir topluluk çalışmasıdır
+- Forum yönetiminden izin alın, `robots.txt` kurallarına uyun
 - Ticari kullanım için izin alın
 
 ## 📄 Lisans
 
-MIT License
-# engelliler-biz-ai
-# engelliler-biz-ai
-# engelliler-biz-ai
-# engelliler-biz-ai
+MIT License — bkz. [LICENSE](LICENSE)
