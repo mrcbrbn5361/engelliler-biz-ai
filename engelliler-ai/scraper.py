@@ -15,6 +15,7 @@ import json
 import logging
 import re
 import time
+import urllib.request
 from pathlib import Path
 from urllib.parse import urljoin, urlparse
 from urllib.robotparser import RobotFileParser
@@ -30,7 +31,9 @@ USER_AGENT = (
     "Mozilla/5.0 (compatible; engelliler-biz-ai/0.2; +https://github.com/mrcbrbn5361/engelliler-biz-ai)"
 )
 CRAWL_DELAY = 2.0  # robots.txt'ye ek olarak istekler arası bekleme (sn)
+ROBOTS_TTL = 3600  # robots.txt önbellek süresi (sn)
 _last_request_at = 0.0
+_robots_cache: dict[str, tuple[float, list[str]]] = {}
 
 
 class ScraperError(Exception):
@@ -65,9 +68,19 @@ def robots_allowed(url: str) -> bool:
     try:
         parsed = urlparse(url)
         robots_url = f"{parsed.scheme}://{parsed.netloc}/robots.txt"
+        now = time.time()
+        cached = _robots_cache.get(robots_url)
+        if cached is not None and now - cached[0] < ROBOTS_TTL:
+            lines = cached[1]
+        else:
+            request = urllib.request.Request(
+                robots_url, headers={"User-Agent": USER_AGENT}
+            )
+            with urllib.request.urlopen(request, timeout=10) as response:
+                lines = response.read().decode("utf-8", errors="ignore").splitlines()
+            _robots_cache[robots_url] = (now, lines)
         rp = RobotFileParser()
-        rp.set_url(robots_url)
-        rp.read()
+        rp.parse(lines)
         return rp.can_fetch(USER_AGENT, url)
     except Exception as exc:  # ağ hatası vb.
         log.warning("robots.txt okunamadı (%s), çekim engellendi: %s", url, exc)
