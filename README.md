@@ -41,6 +41,8 @@ curl -X POST http://localhost:8000/api/ask \
 | `/api/search?q=` | GET | Bilgi tabanında ara |
 | `/api/thread/{id}` | GET | Konu verisini getir (önbellekli) |
 | `/api/knowledge/add/{id}` | POST | Konuyu bilgi tabanına ekle |
+| `/api/knowledge/crawl` | POST | Sitedeki konuları topluca içe aktar |
+| `/api/knowledge/threads` | GET | Yüklü konuları listele |
 | `/api/knowledge/get/{id}` | GET | Kayıtlı konuyu getir |
 | `/api/knowledge/stats` | GET | İstatistikler |
 

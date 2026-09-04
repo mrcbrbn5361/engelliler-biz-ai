@@ -121,6 +121,80 @@ class TestAPI(unittest.TestCase):
         self.assertIn('lang="tr"', r.text)
         self.assertIn("aria-live", r.text)
 
+    def test_threads_endpoint(self):
+        r = self.client.get("/api/knowledge/threads")
+        self.assertEqual(r.status_code, 200)
+        body = r.json()
+        self.assertIn("count", body)
+        self.assertIn("threads", body)
+
+    def test_crawl_validation(self):
+        r = self.client.post("/api/knowledge/crawl", json={"max_threads": 0})
+        self.assertEqual(r.status_code, 422)
+
+    def test_crawl_mocked(self):
+        import api_server
+
+        orig_discover = api_server.discover_forum_urls
+        orig_list = api_server.list_thread_ids
+        orig_scrape = api_server.scrape_thread
+        api_server.discover_forum_urls = lambda: ["https://engelliler.biz/forum/x.60/"]
+        api_server.list_thread_ids = lambda url, n: [111, 222]
+        api_server.scrape_thread = lambda tid, use_cache=True: {
+            "url": f"https://engelliler.biz/konu/x.{tid}/",
+            "title": f"Konu {tid}",
+            "text": "örnek metin",
+            "posts": 1,
+        }
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                orig_kb = api_server.settings.knowledge_file
+                object.__setattr__(api_server.settings, "knowledge_file", Path(tmp) / "kb.json")
+                try:
+                    r = self.client.post(
+                        "/api/knowledge/crawl",
+                        json={"max_threads": 5, "max_pages_per_forum": 1},
+                    )
+                finally:
+                    object.__setattr__(api_server.settings, "knowledge_file", orig_kb)
+            self.assertEqual(r.status_code, 200)
+            body = r.json()
+            self.assertEqual(body["added"], 2)
+            self.assertEqual(body["thread_ids"], [111, 222])
+        finally:
+            api_server.discover_forum_urls = orig_discover
+            api_server.list_thread_ids = orig_list
+            api_server.scrape_thread = orig_scrape
+
+
+class TestThreadParsing(unittest.TestCase):
+    def test_extract_thread_ids(self):
+        from scraper import extract_thread_ids
+
+        html = (
+            '<a href="/konu/birinci-konu.262199/">x</a>'
+            '<a href="https://engelliler.biz/konu/ikinci.4306/">y</a>'
+            '<a href="/konu/birinci-konu.262199/">tekrar</a>'
+            '<a href="/forum/ulasim.60/">forum</a>'
+            '<a href="/uye/ali.123/">uye</a>'
+        )
+        self.assertEqual(extract_thread_ids(html), [262199, 4306])
+
+    def test_extract_empty(self):
+        from scraper import extract_thread_ids
+
+        self.assertEqual(extract_thread_ids(""), [])
+        self.assertEqual(extract_thread_ids("<p>konu yok</p>"), [])
+
+    def test_parse_thread_id(self):
+        from scraper import ScraperError, parse_thread_id
+
+        self.assertEqual(parse_thread_id("262199"), 262199)
+        with self.assertRaises(ScraperError):
+            parse_thread_id("abc")
+        with self.assertRaises(ScraperError):
+            parse_thread_id("-5")
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

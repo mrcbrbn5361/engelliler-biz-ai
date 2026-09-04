@@ -61,6 +61,8 @@
     <ul>
       <li><a href="#soru-formu">Soru sor</a></li>
       <li><a href="#sonuc">Yanıt</a></li>
+      <li><a href="#konu-ekle">Konu ekle</a></li>
+      <li><a href="#yuklu-konular">Yüklü konular</a></li>
       <li><a href="/docs">API belgeleri</a></li>
     </ul>
   </nav>
@@ -89,6 +91,35 @@
     <h2 id="sonuc-baslik">Yanıt</h2>
     <div id="sonuc-metin">Henüz soru sorulmadı. Yanıt burada görünecek.</div>
     <div id="kaynaklar"></div>
+  </section>
+
+  <section id="konu-ekle" aria-labelledby="konu-baslik">
+    <h2 id="konu-baslik">Forum konusu ekle</h2>
+    <p>Adresindeki numarayı yazın. Örnek: <code>/konu/engelli-kimlik-karti.262199/</code> adresinde numara <strong>262199</strong> olur.</p>
+    <form id="konu-formu" action="#" method="post">
+      <label for="konu-id">Konu numarası</label>
+      <input type="number" id="konu-id" name="konu-id" min="1" max="9999999" required
+        inputmode="numeric" placeholder="örn. 262199">
+      <button type="submit" id="konu-gonder">Bilgi tabanına ekle</button>
+    </form>
+    <p id="konu-durum" role="status" aria-live="polite"></p>
+  </section>
+
+  <section id="toplu-ice-aktar" aria-labelledby="toplu-baslik">
+    <h2 id="toplu-baslik">Sitedeki tüm konuları içe aktar</h2>
+    <p>Forum bölümleri tek tek gezilir. Kibar tarama yapılır, bu yüzden uzun sürebilir. Küçük sayıyla başlayın.</p>
+    <form id="toplu-formu" action="#" method="post">
+      <label for="toplu-sayi">En fazla kaç konu eklensin? (1–200)</label>
+      <input type="number" id="toplu-sayi" name="toplu-sayi" min="1" max="200" value="10" required>
+      <button type="submit" id="toplu-gonder">İçe aktarmayı başlat</button>
+    </form>
+    <p id="toplu-durum" role="status" aria-live="polite"></p>
+  </section>
+
+  <section id="yuklu-konular" aria-labelledby="yuklu-baslik">
+    <h2 id="yuklu-baslik">Yüklü konular (<span id="konu-sayisi">0</span>)</h2>
+    <button type="button" id="listeyi-yenile">Listeyi yenile</button>
+    <ul id="konu-listesi"></ul>
   </section>
 </main>
 
@@ -169,6 +200,86 @@
     } finally {
       gonder.disabled = false;
       sonuc.focus({ preventScroll: false });
+    }
+  });
+
+  // Konu ekleme + toplu içe aktarma + liste
+  var konuForm = document.getElementById("konu-formu");
+  var konuId = document.getElementById("konu-id");
+  var konuGonder = document.getElementById("konu-gonder");
+  var konuDurum = document.getElementById("konu-durum");
+  var topluForm = document.getElementById("toplu-formu");
+  var topluSayi = document.getElementById("toplu-sayi");
+  var topluGonder = document.getElementById("toplu-gonder");
+  var topluDurum = document.getElementById("toplu-durum");
+  var konuSayisi = document.getElementById("konu-sayisi");
+  var konuListesi = document.getElementById("konu-listesi");
+
+  async function listeyiYenile() {
+    try {
+      var res = await fetch("/api/knowledge/threads?limit=200");
+      var data = await res.json();
+      konuSayisi.textContent = data.count;
+      konuListesi.innerHTML = "";
+      if (!data.threads.length) {
+        var bos = document.createElement("li");
+        bos.textContent = "Henüz konu yüklenmedi.";
+        konuListesi.appendChild(bos);
+        return;
+      }
+      data.threads.forEach(function (t) {
+        var li = document.createElement("li");
+        li.textContent = "#" + t.thread_id + " — " + (t.title || "başlıksız");
+        konuListesi.appendChild(li);
+      });
+    } catch (err) {
+      konuSayisi.textContent = "?";
+    }
+  }
+  document.getElementById("listeyi-yenile").addEventListener("click", listeyiYenile);
+  listeyiYenile();
+
+  konuForm.addEventListener("submit", async function (e) {
+    e.preventDefault();
+    var id = konuId.value.trim();
+    if (!id || +id < 1) { konuDurum.textContent = "Geçerli bir konu numarası yazın."; konuId.focus(); return; }
+    konuGonder.disabled = true;
+    konuDurum.textContent = id + " numaralı konu ekleniyor, lütfen bekleyin…";
+    try {
+      var res = await fetch("/api/knowledge/add/" + encodeURIComponent(id), { method: "POST" });
+      var data = await res.json();
+      if (!res.ok) throw new Error(data.detail || "Sunucu hatası");
+      konuDurum.textContent = "Eklendi: " + data.title;
+      konuForm.reset();
+      listeyiYenile();
+    } catch (err) {
+      konuDurum.textContent = "Eklenemedi: " + err.message;
+    } finally {
+      konuGonder.disabled = false;
+    }
+  });
+
+  topluForm.addEventListener("submit", async function (e) {
+    e.preventDefault();
+    var n = Math.min(200, Math.max(1, +topluSayi.value || 10));
+    topluGonder.disabled = true;
+    topluDurum.textContent = "İçe aktarma başladı, bu işlem birkaç dakika sürebilir. Sayfayı kapatmayın…";
+    try {
+      var res = await fetch("/api/knowledge/crawl", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ max_threads: n, max_pages_per_forum: 2 })
+      });
+      var data = await res.json();
+      if (!res.ok) throw new Error(data.detail || "Sunucu hatası");
+      topluDurum.textContent = "Bitti: " + data.added + " konu eklendi, " +
+        data.skipped + " konu zaten vardı." +
+        (data.errors.length ? " " + data.errors.length + " sayfada hata oldu." : "");
+      listeyiYenile();
+    } catch (err) {
+      topluDurum.textContent = "İçe aktarma başarısız: " + err.message;
+    } finally {
+      topluGonder.disabled = false;
     }
   });
 })();

@@ -13,9 +13,10 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import re
 import time
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import urljoin, urlparse
 from urllib.robotparser import RobotFileParser
 
 import requests
@@ -122,14 +123,9 @@ def _extract(url: str, html: str) -> dict:
     return {"url": url, "title": title, "text": text[:20000], "posts": len(bodies)}
 
 
-def scrape_forum(url: str, use_cache: bool = True) -> dict:
-    """Forum sayfasını çek ve {url, title, text, posts} sözlüğü döndür."""
+def fetch_html(url: str) -> tuple[str, str]:
+    """Güvenlik kontrollerinden geçirip sayfa HTML'ini indirir; (son_url, html) döndürür."""
     url = validate_url(url)
-    if use_cache:
-        cached = _read_cache(url)
-        if cached is not None:
-            log.info("Önbellekten sunuldu: %s", url)
-            return cached
     if not robots_allowed(url):
         raise ScraperError(
             "Bu sayfanın çekilmesine robots.txt kuralları izin vermiyor."
@@ -148,18 +144,96 @@ def scrape_forum(url: str, use_cache: bool = True) -> dict:
         raise ScraperError(f"Sayfa alınamadı (HTTP {exc.response.status_code}).")
     except requests.RequestException as exc:
         raise ScraperError(f"Bağlantı hatası: {exc}")
-    data = _extract(url, response.text)
+    return response.url, response.text
+
+
+def scrape_forum(url: str, use_cache: bool = True) -> dict:
+    """Forum sayfasını çek ve {url, title, text, posts} sözlüğü döndür."""
+    url = validate_url(url)
+    if use_cache:
+        cached = _read_cache(url)
+        if cached is not None:
+            log.info("Önbellekten sunuldu: %s", url)
+            return cached
+    final_url, html = fetch_html(url)
+    data = _extract(final_url, html)
     _write_cache(url, data)
     return data
 
 
-def scrape_thread(thread_id: int | str, use_cache: bool = True) -> dict:
-    """Konu numarasından URL üretip çeker: /threads/<id>."""
+def parse_thread_id(value: int | str) -> int:
+    """Konu numarasını doğrula; geçersizse ScraperError yükselt."""
     try:
-        thread_id = int(str(thread_id).strip())
+        thread_id = int(str(value).strip())
         if thread_id <= 0:
             raise ValueError
+        return thread_id
     except (ValueError, AttributeError):
         raise ScraperError("Konu numarası pozitif bir sayı olmalıdır.")
+
+
+def scrape_thread(thread_id: int | str, use_cache: bool = True) -> dict:
+    """Konu numarasından URL üretip çeker: /konu/<id>/ (301 ile kanoniğe gider)."""
+    tid = parse_thread_id(thread_id)
     base = f"https://{settings.allowed_scrape_domain}"
-    return scrape_forum(f"{base}/threads/{thread_id}/", use_cache=use_cache)
+    return scrape_forum(f"{base}/konu/{tid}/", use_cache=use_cache)
+
+
+# Bu forumda konu adresleri /konu/<slug>.<id>/ biçimindedir (eski /threads/ de olabilir).
+THREAD_RE = re.compile(r"/(?:konu|threads)/(?:[^\"'<>]*?\.)?(\d+)/?")
+
+
+def extract_thread_ids(html: str) -> list[int]:
+    """Sayfa HTML'inden sıralı, tekrarsız konu numaraları çıkar (ağ gerektirmez)."""
+    seen: dict[int, None] = {}
+    for match in THREAD_RE.finditer(html or ""):
+        try:
+            tid = int(match.group(1))
+        except ValueError:
+            continue
+        if tid > 0 and tid not in seen:
+            seen[tid] = None
+    return list(seen)
+
+
+def _next_page_url(html: str, current_url: str) -> str | None:
+    """XenForo sayfalamasında sonraki sayfa adresi (yoksa None)."""
+    soup = BeautifulSoup(html, "html.parser")
+    link = soup.select_one("a.pageNav-jump--next[href], a[rel='next'][href]")
+    if link and link.get("href"):
+        return urljoin(current_url, link["href"])
+    return None
+
+
+def list_thread_ids(listing_url: str, max_pages: int = 3) -> list[int]:
+    """Konu listeleme sayfalarını gezip konu numaraları toplar."""
+    max_pages = min(max(max_pages, 1), 10)
+    collected: dict[int, None] = {}
+    url: str | None = validate_url(listing_url)
+    for _ in range(max_pages):
+        if url is None:
+            break
+        _, html = fetch_html(url)
+        for tid in extract_thread_ids(html):
+            if tid not in collected:
+                collected[tid] = None
+        url = _next_page_url(html, url)
+    return list(collected)
+
+
+# Forum adresleri /forum/<slug>.<id>/ biçimindedir.
+FORUM_RE = re.compile(r"href=\"([^\"]*?/forum/[^\"<>]*?\.(\d+)/?)\"")
+
+
+def discover_forum_urls() -> list[str]:
+    """Ana sayfadaki forum bölümlerinin adreslerini bulur."""
+    base = f"https://{settings.allowed_scrape_domain}"
+    _, html = fetch_html(base + "/")
+    urls: dict[str, None] = {}
+    for match in FORUM_RE.finditer(html or ""):
+        full = urljoin(base + "/", match.group(1))
+        try:
+            urls[validate_url(full)] = None
+        except ScraperError:
+            continue
+    return list(urls)

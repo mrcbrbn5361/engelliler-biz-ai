@@ -19,8 +19,14 @@ from pydantic import BaseModel, Field
 
 from ai_engine import AIEngineError, generate_response
 from config import settings
-from knowledge import add_entry, get_entry, search, stats
-from scraper import ScraperError, scrape_forum, scrape_thread
+from knowledge import add_entry, get_entry, list_entries, search, stats
+from scraper import (
+    ScraperError,
+    discover_forum_urls,
+    list_thread_ids,
+    scrape_forum,
+    scrape_thread,
+)
 
 BASE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = BASE_DIR / "static"
@@ -59,6 +65,11 @@ class AskResponse(BaseModel):
     answer: str
     sources: list[dict] = []
     ai_used: bool
+
+
+class CrawlRequest(BaseModel):
+    max_threads: int = Field(default=10, ge=1, le=200)
+    max_pages_per_forum: int = Field(default=2, ge=1, le=10)
 
 
 @app.get("/health", summary="Sağlık kontrolü")
@@ -121,6 +132,61 @@ def knowledge_get(thread_id: int) -> dict:
             detail="Bu konu bilgi tabanında yok, önce /api/knowledge/add ile ekleyin.",
         )
     return {"thread_id": str(thread_id), **entry}
+
+
+@app.get("/api/knowledge/threads", summary="Yüklü konuları listele")
+def knowledge_threads(limit: int = 200) -> dict:
+    entries = list_entries(min(max(limit, 1), 500))
+    return {"count": len(entries), "threads": entries}
+
+
+@app.post("/api/knowledge/crawl", summary="Sitedeki konuları topluca içe aktar")
+def knowledge_crawl(body: CrawlRequest) -> dict:
+    """Forum bölümlerini gezip yeni konuları bilgi tabanına ekler.
+
+    Kibar tarama: robots.txt + 2 sn bekleme + önbellek. Büyük sayılar
+    dakikalar sürebilir; küçük başlayın (örn. 10 konu).
+    """
+    try:
+        forums = discover_forum_urls()
+    except ScraperError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+    if not forums:
+        raise HTTPException(
+            status_code=502, detail="Forum bölümleri bulunamadı, sonra tekrar deneyin."
+        )
+    added, skipped, errors = 0, 0, []
+    done_ids: list[int] = []
+    for forum_url in forums:
+        if added >= body.max_threads:
+            break
+        try:
+            tids = list_thread_ids(forum_url, body.max_pages_per_forum)
+        except ScraperError as exc:
+            errors.append(f"{forum_url}: {exc}")
+            continue
+        for tid in tids:
+            if added >= body.max_threads:
+                break
+            if get_entry(tid) is not None:
+                skipped += 1
+                continue
+            try:
+                data = scrape_thread(tid)
+            except ScraperError as exc:
+                if len(errors) < 10:
+                    errors.append(f"Konu {tid}: {exc}")
+                continue
+            add_entry(tid, data["title"], data["text"], data["url"])
+            done_ids.append(tid)
+            added += 1
+    return {
+        "added": added,
+        "skipped": skipped,
+        "forums_scanned": len(forums),
+        "thread_ids": done_ids,
+        "errors": errors,
+    }
 
 
 if STATIC_DIR.exists():

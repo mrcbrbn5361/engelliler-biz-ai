@@ -89,3 +89,13 @@ def stats() -> dict:
         "ai_enabled": settings.ai_enabled,
         "model": settings.openrouter_model,
     }
+
+
+def list_entries(limit: int = 200) -> list[dict]:
+    """Kayıtlı konuları [{thread_id, title, url}] olarak listele (arayüz için)."""
+    with _lock:
+        threads = _load()["threads"]
+    return [
+        {"thread_id": tid, "title": e.get("title", ""), "url": e.get("url", "")}
+        for tid, e in sorted(threads.items(), key=lambda kv: int(kv[0]) if kv[0].isdigit() else kv[0])
+    ][:limit]
